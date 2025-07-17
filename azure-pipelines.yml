@@ -25,7 +25,7 @@ stages:
 
     - task: TerraformInstaller@1
       inputs:
-        terraformVersion: '1.5.7'
+        terraformVersion: '$(tf_version)'
       displayName: 'Install Terraform'
 
     - task: AzureCLI@2
