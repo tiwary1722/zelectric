@@ -23,11 +23,9 @@ stages:
       inputs:
         versionSpec: '3.x'
 
-    - script: |
-        curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-        echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list
-        apt update && apt install terraform -y
-        terraform version
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '1.5.7'
       displayName: 'Install Terraform'
 
     - task: AzureCLI@2
@@ -39,3 +37,8 @@ stages:
         inlineScript: |
           terraform init -backend-config="resource_group_name=$(backend_rg)" \
                          -backend-config="storage_account_name=$(backend_storage)" \
+                         -backend-config="container_name=$(container_name)" \
+                         -backend-config="key=dev.terraform.tfstate"
+
+          terraform plan -var-file="terraform.tfvars"
+          terraform apply -auto-approve -var-file="terraform.tfvars"
