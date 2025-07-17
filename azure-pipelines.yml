@@ -19,10 +19,6 @@ stages:
   jobs:
   - job: terraform
     steps:
-    - task: UsePythonVersion@0
-      inputs:
-        versionSpec: '3.x'
-
     - task: TerraformInstaller@1
       inputs:
         terraformVersion: '$(tf_version)'
