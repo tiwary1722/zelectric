@@ -31,11 +31,19 @@ stages:
         scriptLocation: 'inlineScript'
         workingDirectory: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev'
         inlineScript: |
-          echo "Initializing Terraform backend..."
+          echo "Cleaning local Terraform cache..."
+          # Remove existing .terraform directory and lock file to ensure a clean slate
+          rm -rf .terraform
+          rm -f .terraform.lock.hcl # Use -f for files in bash
+
+          echo "Initializing Terraform backend with upgrade and reconfigure..."
+          # Use -upgrade to force re-download and update lock file if needed
+          # Use -reconfigure to discard any existing configuration and re-initialize
           terraform init -backend-config="resource_group_name=$(backend_rg)" \
                          -backend-config="storage_account_name=$(backend_storage)" \
                          -backend-config="container_name=$(container_name)" \
-                         -backend-config="key=dev.terraform.tfstate"
+                         -backend-config="key=dev.terraform.tfstate" \
+                         -upgrade -reconfigure # ADDED FLAGS HERE
 
           echo "Generating Terraform plan..."
           terraform plan -out=tfplan -var-file="terraform.tfvars"
@@ -71,11 +79,19 @@ stages:
         scriptLocation: 'inlineScript'
         workingDirectory: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev'
         inlineScript: |
-          echo "Initializing Terraform backend for apply..."
+          echo "Cleaning local Terraform cache for apply..."
+          # Remove existing .terraform directory and lock file to ensure a clean slate
+          rm -rf .terraform
+          rm -f .terraform.lock.hcl # Use -f for files in bash
+
+          echo "Initializing Terraform backend for apply with upgrade and reconfigure..."
+          # Use -upgrade to force re-download and update lock file if needed
+          # Use -reconfigure to discard any existing configuration and re-initialize
           terraform init -backend-config="resource_group_name=$(backend_rg)" \
                          -backend-config="storage_account_name=$(backend_storage)" \
                          -backend-config="container_name=$(container_name)" \
-                         -backend-config="key=dev.terraform.tfstate"
+                         -backend-config="key=dev.terraform.tfstate" \
+                         -upgrade -reconfigure # ADDED FLAGS HERE
 
           echo "Applying Terraform plan..."
           terraform apply -auto-approve tfplan
