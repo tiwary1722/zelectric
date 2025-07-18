@@ -1,28 +1,13 @@
-trigger:
-  branches:
-    include:
-      - main
-      - dev
-
-variables:
-  backend_rg: dontestingrg
-  backend_storage: dontestingstorageacct
-  container_name: tfstate
-  tf_version: '1.5.7'
-
-pool:
-  vmImage: 'ubuntu-latest'
-
 stages:
-- stage: Terraform_Dev
-  displayName: "Terraform Plan and Apply - Dev"
+- stage: Terraform_Dev_Plan
+  displayName: "Terraform Plan - Dev"
   jobs:
-  - job: terraform
+  - job: plan
     steps:
     - task: TerraformInstaller@1
       inputs:
         terraformVersion: '$(tf_version)'
-      displayName: 'Install Terraform'
+      displayName: 'Install Terraform CLI for Plan'
 
     - task: AzureCLI@2
       inputs:
@@ -31,10 +16,52 @@ stages:
         scriptLocation: 'inlineScript'
         workingDirectory: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev'
         inlineScript: |
+          echo "Initializing Terraform backend..."
           terraform init -backend-config="resource_group_name=$(backend_rg)" \
                          -backend-config="storage_account_name=$(backend_storage)" \
                          -backend-config="container_name=$(container_name)" \
                          -backend-config="key=dev.terraform.tfstate"
 
-          terraform plan -var-file="terraform.tfvars"
-          terraform apply -auto-approve -var-file="terraform.tfvars"
+          echo "Generating Terraform plan..."
+          terraform plan -out=tfplan -var-file="terraform.tfvars"
+      displayName: 'Terraform Init and Plan'
+
+    - publish: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev/tfplan'
+      artifact: 'TerraformPlan'
+      displayName: 'Publish Terraform Plan Artifact'
+
+- stage: Terraform_Dev_Apply
+  displayName: "Terraform Apply - Dev"
+  dependsOn: Terraform_Dev_Plan
+  condition: succeeded()
+  jobs:
+  - job: apply
+    steps:
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: '$(tf_version)'
+      displayName: 'Install Terraform CLI for Apply'
+
+    # CORRECTED SECTION: Use DownloadPipelineArtifact@2 with targetPath
+    - task: DownloadPipelineArtifact@2
+      inputs:
+        artifactName: 'TerraformPlan' # Name of the artifact published in the Plan stage
+        targetPath: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev' # This is where it will be downloaded
+      displayName: 'Download Terraform Plan Artifact'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Azure subscription 1'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/ZELECTRIC/environments/dev'
+        inlineScript: |
+          echo "Initializing Terraform backend for apply..."
+          terraform init -backend-config="resource_group_name=$(backend_rg)" \
+                         -backend-config="storage_account_name=$(backend_storage)" \
+                         -backend-config="container_name=$(container_name)" \
+                         -backend-config="key=dev.terraform.tfstate"
+
+          echo "Applying Terraform plan..."
+          terraform apply -auto-approve tfplan # This will use the downloaded tfplan artifact
+      displayName: 'Terraform Apply'
